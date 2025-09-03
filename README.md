@@ -179,9 +179,9 @@ The expected layout inside the Hub repo is: `<SUBDIR>/<EXP_NAME>/best.weights.h5
 
 | Model    | Subdir on Hub              | Example exp_name | Direct link (folder) |
 |---------|-----------------------------|------------------|----------------------|
-| MF      | `MF/`                       | `exp-mf64`       | https://huggingface.co/farchan/CDR-checkpoints/tree/main/MF |
-| NeuMF   | `NEUMF/`                    | `exp-neumf`      | https://huggingface.co/farchan/CDR-checkpoints/tree/main/NEUMF |
-| ItemKNN | `ITEMKNN/` or `MF/ITEMKNN/` | `exp-itemknn`    | https://huggingface.co/farchan/CDR-checkpoints/tree/main/MF/ITEMKNN |
+| MF      | `MF/`                       | `exp-mf64`       | [Link](https://huggingface.co/farchan/CDR-checkpoints/tree/main/MF) |
+| NeuMF   | `NEUMF/`                    | `exp-neumf`      | [Link](https://huggingface.co/farchan/CDR-checkpoints/tree/main/NEUMF) |
+| ItemKNN | `ITEMKNN/` or `MF/ITEMKNN/` | `exp-itemknn`    | [Link](https://huggingface.co/farchan/CDR-checkpoints/tree/main/MF/ITEMKNN) |
 | LightGCN| `LIGHTGCN/`                 | `exp-lgcn`       | *(add if you upload)* |
 
 Examples:
@@ -191,10 +191,6 @@ Examples:
 python scripts/evaluate.py   --data_dir artifacts/movies_from_music/data   --model mf --exp_name exp-mf64   --hf_repo farchan/CDR-checkpoints   --split test --topk 10 --eval_negs 99 --save_embeddings
 ```
 
-```bash
-# Pull NeuMF weights from the Hub
-python scripts/evaluate.py   --data_dir artifacts/movies_from_music/data   --model neumf --exp_name exp-neumf   --hf_repo farchan/CDR-checkpoints   --split test --topk 10 --eval_negs 99
-```
 
 ---
 
