@@ -6,16 +6,7 @@ End-to-end pipeline for cross-domain recommendation.
 ## Demo (GIF)
 If your README viewer supports images, this will animate inline:
 
-![Interactive demo](assets/demo.gif)
-
-> Tip: keep the GIF short (≤10–15s) and under ~10 MB. If you store the GIF in the repo,
-> track it with **Git LFS**:
-> ```bash
-> git lfs install
-> git lfs track "assets/*.gif"
-> git add .gitattributes assets/demo.gif
-> git commit -m "Add demo GIF"
-> ```
+![Interactive demo](NOTEBOOK/interactive_demo.gif)
 
 ---
 
