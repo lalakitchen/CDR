@@ -3,6 +3,22 @@ End-to-end pipeline for cross-domain recommendation.
 
 ---
 
+## Demo (GIF)
+If your README viewer supports images, this will animate inline:
+
+![Interactive demo](assets/demo.gif)
+
+> Tip: keep the GIF short (≤10–15s) and under ~10 MB. If you store the GIF in the repo,
+> track it with **Git LFS**:
+> ```bash
+> git lfs install
+> git lfs track "assets/*.gif"
+> git add .gitattributes assets/demo.gif
+> git commit -m "Add demo GIF"
+> ```
+
+---
+
 ## Repo layout
 
 ```
@@ -10,7 +26,7 @@ End-to-end pipeline for cross-domain recommendation.
 ├── README.md
 ├── requirements.txt
 ├── scripts/
-│   ├── download_amazon_2018.py        # dataset fetch helper (Python)
+│   ├── download_amazon_2018.py        # dataset fetch helper
 │   ├── preprocess_amazon_cdr.py       # data prep entrypoint
 │   └── train.py                       # training + eval
 ├── src/
@@ -27,15 +43,20 @@ End-to-end pipeline for cross-domain recommendation.
 │       │   ├── __init__.py
 │       │   ├── mf.py                  # Matrix Factorization (TF)
 │       │   ├── neumf.py               # Neural Collaborative Filtering
+│       │   ├── neumf_attention.py     # NeuMF + QKV attention
 │       │   ├── itemknn.py             # Item-based CF (memory-based)
-│       │   └── lightgcn.py            # Graph recommender
+│       │   ├── lightgcn.py            # Graph recommender
+│       │   └── lightgcn_attention.py  # LightGCN + QKV over layers
 │       └── train/
 │           ├── __init__.py
 │           └── trainer.py             # training loop
+├── notebook/
+│   ├── EDA.ipynb
+│   └── INTERACTIVE_DEMO.ipynb
 ├── data/
 │   └── amazon2018/                    # reviews/, metadata/ (not tracked)
 ├── artifacts/
-│   └── movies_from_music/
+│   └── <dataset_name>/
 │       ├── data/                      # train.parquet, val.parquet, test.parquet
 │       └── maps/                      # user_id_map.json, item_id_map.json
 └── checkpoint/
@@ -134,6 +155,7 @@ artifacts/movies_from_music/
 ```
 
 ---
+
 ## Train and evaluate
 
 All models use pairwise ranking (BPR) by default. Evaluation samples `eval_negs` negatives per positive.
@@ -148,7 +170,15 @@ python scripts/train.py \
   [--loss bpr] [--save_embeddings] \
   [--itemknn_topk_neighbors 200] \
   [--lightgcn_layers 3]
+```
 
+Quick presets (fill `<your-exp-name>` and `<n>`):
+- **MF**: `--model mf --epochs 30`
+- **NeuMF**: `--model neumf --epochs 30`
+- **NeuMF + Attention (QKV)**: `--model neumf_attention --epochs 30`
+- **ItemKNN**: `--model itemknn --epochs 0 --itemknn_topk_neighbors 200`
+- **LightGCN**: `--model lightgcn --epochs 30 --lightgcn_layers 3`
+- **LightGCN + Attention (QKV)**: `--model lightgcn_attention --epochs 30 --lightgcn_layers 3`
 
 Artifacts per run:
 
@@ -169,14 +199,14 @@ checkpoint/<MODEL>/<EXP_NAME>/
 ## Checkpoints on Hugging Face
 
 If a local weights file is missing, `scripts/evaluate.py` can download one from the Hub.
-The expected layout inside the model repo is: `<SUBDIR>/<EXP_NAME>/best.weights.h5`.
+The expected layout inside the Hub repo is: `<SUBDIR>/<EXP_NAME>/best.weights.h5`.
 
-| Model    | Subdir on Hub | Example exp_name | Direct link (folder) |
-|---------|----------------|------------------|----------------------|
-| MF      | `MF/`          | `exp-mf64`       | https://huggingface.co/farchan/CDR-checkpoints/tree/main/MF |
-| NeuMF   | `NEUMF/`       | `exp-neumf`      | https://huggingface.co/farchan/CDR-checkpoints/tree/main/NEUMF |
-| ItemKNN | `ITEMKNN/` or `MF/ITEMKNN/` | `exp-itemknn` | https://huggingface.co/farchan/CDR-checkpoints/tree/main/ITEMKNN |
-| LightGCN| `LIGHTGCN/`    | `exp-lgcn`       | *(add if you upload)* |
+| Model    | Subdir on Hub          | Example exp_name | Direct link (folder) |
+|---------|-------------------------|------------------|----------------------|
+| MF      | `MF/`                   | `exp-mf64`       | https://huggingface.co/farchan/CDR-checkpoints/tree/main/MF |
+| NeuMF   | `NEUMF/`                | `exp-neumf`      | https://huggingface.co/farchan/CDR-checkpoints/tree/main/NEUMF |
+| ItemKNN | `ITEMKNN/` or `MF/ITEMKNN/` | `exp-itemknn` | https://huggingface.co/farchan/CDR-checkpoints/tree/main/MF/ITEMKNN |
+| LightGCN| `LIGHTGCN/`             | `exp-lgcn`       | *(add if you upload)* |
 
 Examples:
 
@@ -187,7 +217,9 @@ python scripts/evaluate.py \
   --model mf --exp_name exp-mf64 \
   --hf_repo farchan/CDR-checkpoints \
   --split test --topk 10 --eval_negs 99 --save_embeddings
+```
 
+```bash
 # Pull NeuMF weights from the Hub
 python scripts/evaluate.py \
   --data_dir artifacts/movies_from_music/data \
@@ -198,19 +230,35 @@ python scripts/evaluate.py \
 
 ---
 
+## Notebooks
+
+- `notebook/EDA.ipynb` – quick data exploration.
+- `notebook/INTERACTIVE_DEMO.ipynb` – small UI for trying a trained model.  
+  Save a short screen recording of this and convert it to `assets/demo.gif` (used at the top).
+  Example (ffmpeg):
+  ```bash
+  ffmpeg -i demo.mp4 -vf "fps=20,scale=900:-1:flags=lanczos" -loop 0 assets/demo.gif
+  ```
+
+Launch Jupyter:
+```bash
+jupyter notebook notebook/
+```
+
+---
+
 ## Test set results (fill in your runs)
 
-This table to track results on the **target** domain test split. `@10` means K=10.
+This table tracks results on the **target** domain test split. `@10` means K=10.
 
 | Model | Exp name | K | Precision@10 | Recall@10 | F1@10 | Acc@10 | NDCG@10 | Notes |
 |------|----------|---|--------------|-----------|-------|--------|---------|-------|
 | MF | exp-mf64 | 10 |  |  |  |  |  |  |
 | NeuMF | exp-neumf | 10 |  |  |  |  |  |  |
+| NeuMF+Attn | exp-neumf-attn | 10 |  |  |  |  |  |  |
 | ItemKNN | exp-itemknn | 10 |  |  |  |  |  |  |
 | LightGCN | exp-lgcn | 10 |  |  |  |  |  |  |
-
-
----
+| LightGCN+Attn | exp-lgcn-attn | 10 |  |  |  |  |  |  |
 
 `@10` means we evaluate using the **top 10** items returned for each user.
 
