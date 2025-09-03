@@ -134,52 +134,21 @@ artifacts/movies_from_music/
 ```
 
 ---
+## Train and evaluate
 
-## Train and evaluate (local checkpoints)
+All models use pairwise ranking (BPR) by default. Evaluation samples `eval_negs` negatives per positive.
 
-All trainable models use pairwise ranking (BPR) by default. Evaluation is sampled with `eval_negs` negatives per positive.
-
-### MF (baseline)
-
+Use this one command for any model:
 ```bash
 python scripts/train.py \
   --data_dir artifacts/movies_from_music/data \
-  --model mf --loss bpr \
-  --exp_name exp-mf64 --out_root checkpoint \
-  --epochs 30 --emb_dim 64 --topk 10 --eval_negs 99 \
-  --save_embeddings
-```
+  --model <mf|neumf|neumf_attention|itemknn|lightgcn|lightgcn_attention> \
+  --exp_name <your-exp-name> --out_root checkpoint \
+  --epochs <n> --emb_dim 64 --topk 10 --eval_negs 99 \
+  [--loss bpr] [--save_embeddings] \
+  [--itemknn_topk_neighbors 200] \
+  [--lightgcn_layers 3]
 
-### NeuMF (deep)
-
-```bash
-python scripts/train.py \
-  --data_dir artifacts/movies_from_music/data \
-  --model neumf --loss bpr \
-  --exp_name exp-neumf --out_root checkpoint \
-  --epochs 30 --emb_dim 64 --topk 10 --eval_negs 99
-```
-
-### ItemKNN (memory-based CF, non-trainable)
-
-```bash
-python scripts/train.py \
-  --data_dir artifacts/movies_from_music/data \
-  --model itemknn \
-  --exp_name exp-itemknn --out_root checkpoint \
-  --epochs 0 --itemknn_topk_neighbors 200
-```
-
-### LightGCN (graph)
-
-```bash
-python scripts/train.py \
-  --data_dir artifacts/movies_from_music/data \
-  --model lightgcn --loss bpr \
-  --exp_name exp-lgcn --out_root checkpoint \
-  --epochs 30 --emb_dim 64 --lightgcn_layers 3 \
-  --topk 10 --eval_negs 99
-```
 
 Artifacts per run:
 
