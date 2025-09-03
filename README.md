@@ -3,9 +3,7 @@ End-to-end pipeline for cross-domain recommendation.
 
 ---
 
-## Demo (GIF)
-If your README viewer supports images, this will animate inline:
-
+## Demo 
 ![Interactive demo](notebook/interactive_demo.gif)
 
 
