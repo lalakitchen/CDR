@@ -8,6 +8,7 @@ If your README viewer supports images, this will animate inline:
 
 ![Interactive demo](NOTEBOOK/interactive_demo.gif)
 
+
 ---
 
 ## Repo layout
@@ -99,10 +100,7 @@ GPU is optional. If TensorFlow cannot see your GPU, it will run on CPU.
 This helper creates the folder structure and downloads gzipped JSON files for reviews and metadata.
 
 ```bash
-python scripts/download_amazon_2018.py \
-  --root data/amazon2018 \
-  --cats Books Movies_and_TV CDs_and_Vinyl \
-         Clothing_Shoes_and_Jewelry Electronics Home_and_Kitchen Toys_and_Games
+python scripts/download_amazon_2018.py   --root data/amazon2018   --cats Books Movies_and_TV CDs_and_Vinyl          Clothing_Shoes_and_Jewelry Electronics Home_and_Kitchen Toys_and_Games
 ```
 
 Tips:
@@ -122,12 +120,7 @@ What this does:
 Run:
 
 ```bash
-python scripts/preprocess_amazon_cdr.py \
-  --root data/amazon2018 \
-  --source CDs_and_Vinyl \
-  --target Movies_and_TV \
-  --out artifacts/movies_from_music \
-  --print_stats --save_stats
+python scripts/preprocess_amazon_cdr.py   --root data/amazon2018   --source CDs_and_Vinyl   --target Movies_and_TV   --out artifacts/movies_from_music   --print_stats --save_stats
 ```
 
 Outputs:
@@ -153,14 +146,7 @@ All models use pairwise ranking (BPR) by default. Evaluation samples `eval_negs`
 
 Use this one command for any model:
 ```bash
-python scripts/train.py \
-  --data_dir artifacts/movies_from_music/data \
-  --model <mf|neumf|neumf_attention|itemknn|lightgcn|lightgcn_attention> \
-  --exp_name <your-exp-name> --out_root checkpoint \
-  --epochs <n> --emb_dim 64 --topk 10 --eval_negs 99 \
-  [--loss bpr] [--save_embeddings] \
-  [--itemknn_topk_neighbors 200] \
-  [--lightgcn_layers 3]
+python scripts/train.py   --data_dir artifacts/movies_from_music/data   --model <mf|neumf|neumf_attention|itemknn|lightgcn|lightgcn_attention>   --exp_name <your-exp-name> --out_root checkpoint   --epochs <n> --emb_dim 64 --topk 10 --eval_negs 99   [--loss bpr] [--save_embeddings]   [--itemknn_topk_neighbors 200]   [--lightgcn_layers 3]
 ```
 
 Quick presets (fill `<your-exp-name>` and `<n>`):
@@ -192,31 +178,23 @@ checkpoint/<MODEL>/<EXP_NAME>/
 If a local weights file is missing, `scripts/evaluate.py` can download one from the Hub.
 The expected layout inside the Hub repo is: `<SUBDIR>/<EXP_NAME>/best.weights.h5`.
 
-| Model    | Subdir on Hub          | Example exp_name | Direct link (folder) |
-|---------|-------------------------|------------------|----------------------|
-| MF      | `MF/`                   | `exp-mf64`       | https://huggingface.co/farchan/CDR-checkpoints/tree/main/MF |
-| NeuMF   | `NEUMF/`                | `exp-neumf`      | https://huggingface.co/farchan/CDR-checkpoints/tree/main/NEUMF |
-| ItemKNN | `ITEMKNN/` or `MF/ITEMKNN/` | `exp-itemknn` | https://huggingface.co/farchan/CDR-checkpoints/tree/main/MF/ITEMKNN |
-| LightGCN| `LIGHTGCN/`             | `exp-lgcn`       | *(add if you upload)* |
+| Model    | Subdir on Hub              | Example exp_name | Direct link (folder) |
+|---------|-----------------------------|------------------|----------------------|
+| MF      | `MF/`                       | `exp-mf64`       | https://huggingface.co/farchan/CDR-checkpoints/tree/main/MF |
+| NeuMF   | `NEUMF/`                    | `exp-neumf`      | https://huggingface.co/farchan/CDR-checkpoints/tree/main/NEUMF |
+| ItemKNN | `ITEMKNN/` or `MF/ITEMKNN/` | `exp-itemknn`    | https://huggingface.co/farchan/CDR-checkpoints/tree/main/MF/ITEMKNN |
+| LightGCN| `LIGHTGCN/`                 | `exp-lgcn`       | *(add if you upload)* |
 
 Examples:
 
 ```bash
 # Pull MF weights from the Hub
-python scripts/evaluate.py \
-  --data_dir artifacts/movies_from_music/data \
-  --model mf --exp_name exp-mf64 \
-  --hf_repo farchan/CDR-checkpoints \
-  --split test --topk 10 --eval_negs 99 --save_embeddings
+python scripts/evaluate.py   --data_dir artifacts/movies_from_music/data   --model mf --exp_name exp-mf64   --hf_repo farchan/CDR-checkpoints   --split test --topk 10 --eval_negs 99 --save_embeddings
 ```
 
 ```bash
 # Pull NeuMF weights from the Hub
-python scripts/evaluate.py \
-  --data_dir artifacts/movies_from_music/data \
-  --model neumf --exp_name exp-neumf \
-  --hf_repo farchan/CDR-checkpoints \
-  --split test --topk 10 --eval_negs 99
+python scripts/evaluate.py   --data_dir artifacts/movies_from_music/data   --model neumf --exp_name exp-neumf   --hf_repo farchan/CDR-checkpoints   --split test --topk 10 --eval_negs 99
 ```
 
 ---
@@ -225,10 +203,10 @@ python scripts/evaluate.py \
 
 - `notebook/EDA.ipynb` – quick data exploration.
 - `notebook/INTERACTIVE_DEMO.ipynb` – small UI for trying a trained model.  
-  Save a short screen recording of this and convert it to `assets/demo.gif` (used at the top).
+  Save a short screen recording of this and convert it to `NOTEBOOK/interactive_demo.gif` (used at the top).
   Example (ffmpeg):
   ```bash
-  ffmpeg -i demo.mp4 -vf "fps=20,scale=900:-1:flags=lanczos" -loop 0 assets/demo.gif
+  ffmpeg -i demo.mp4 -vf "fps=20,scale=900:-1:flags=lanczos" -loop 0 NOTEBOOK/interactive_demo.gif
   ```
 
 Launch Jupyter:
