@@ -4,7 +4,6 @@ End-to-end pipeline for cross-domain recommendation.
 ---
 
 ## Demo
-If your viewer supports GIFs, this will animate inline:
 
 ![Interactive demo](notebook/interactive_demo.gif)
 
