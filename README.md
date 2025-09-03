@@ -1,5 +1,5 @@
-# Cross-Domain Recommendation 
-End-to-end pipeline for cross-domain recommendation 
+# Cross-Domain Recommendation
+End-to-end pipeline for cross-domain recommendation.
 
 ---
 
@@ -12,7 +12,7 @@ End-to-end pipeline for cross-domain recommendation
 ├── scripts/
 │   ├── download_amazon_2018.py        # dataset fetch helper (Python)
 │   ├── preprocess_amazon_cdr.py       # data prep entrypoint
-│   └── train.py                       # training + eval 
+│   └── train.py                       # training + eval
 ├── src/
 │   └── cdr/
 │       ├── __init__.py
@@ -29,15 +29,9 @@ End-to-end pipeline for cross-domain recommendation
 │       │   ├── neumf.py               # Neural Collaborative Filtering
 │       │   ├── itemknn.py             # Item-based CF (memory-based)
 │       │   └── lightgcn.py            # Graph recommender
-│       ├── policy/
-│       │   ├── __init__.py
-│       │   ├── base.py                # policy interface
-│       │   ├── epsilon.py             # epsilon-greedy
-│       │   ├── ucb.py                 # UCB1
-│       │   └── linucb.py              # LinUCB (uses embeddings as features)
 │       └── train/
 │           ├── __init__.py
-│           └── trainer.py             # training loop 
+│           └── trainer.py             # training loop
 ├── data/
 │   └── amazon2018/                    # reviews/, metadata/ (not tracked)
 ├── artifacts/
@@ -50,13 +44,12 @@ End-to-end pipeline for cross-domain recommendation
     ├── ITEMKNN/
     └── LIGHTGCN/
         └── <exp_name>/
-            ├── best.weights
+            ├── best.weights.h5
             ├── hparams.json
             ├── metrics.json
             ├── train_log.csv
             ├── test_metrics.csv
-            ├── REPORT.txt
- 
+            └── REPORT.txt
 ```
 
 ---
@@ -80,6 +73,7 @@ pandas
 pyarrow
 tqdm
 scipy
+huggingface_hub
 ```
 
 GPU is optional. If TensorFlow cannot see your GPU, it will run on CPU.
@@ -90,7 +84,7 @@ GPU is optional. If TensorFlow cannot see your GPU, it will run on CPU.
 
 ### 1) Download Amazon 2018 categories
 
-The helper creates the folder structure and downloads gzipped JSON files for reviews and metadata.
+This helper creates the folder structure and downloads gzipped JSON files for reviews and metadata.
 
 ```bash
 python scripts/download_amazon_2018.py \
@@ -100,8 +94,8 @@ python scripts/download_amazon_2018.py \
 ```
 
 Tips:
-- If you only need a Music -> Movies scenario, pass just `CDs_and_Vinyl` and `Movies_and_TV`.
-- Files are large. Make sure you have enough disk space.
+- If you only need a Music → Movies scenario, pass just `CDs_and_Vinyl` and `Movies_and_TV`.
+- These files are large.
 
 ### 2) Preprocess to cross-domain splits
 
@@ -110,7 +104,7 @@ What this does:
 - Keeps items without metadata by filling `item_cat="unknown"`.
 - Keeps users with fewer than 5 interactions.
 - Filters to overlapping users across source and target (unless `--keep_all_users`).
-- Target split per user: last -> test, second-last -> val, rest -> train.
+- Target split per user: last → test, second-last → val, rest → train.
 - Train set = all source interactions + target train interactions.
 
 Run:
@@ -141,7 +135,7 @@ artifacts/movies_from_music/
 
 ---
 
-## Train and evaluate
+## Train and evaluate (local checkpoints)
 
 All trainable models use pairwise ranking (BPR) by default. Evaluation is sampled with `eval_negs` negatives per positive.
 
@@ -171,7 +165,7 @@ python scripts/train.py \
 ```bash
 python scripts/train.py \
   --data_dir artifacts/movies_from_music/data \
-  --model itemknn --loss bpr \
+  --model itemknn \
   --exp_name exp-itemknn --out_root checkpoint \
   --epochs 0 --itemknn_topk_neighbors 200
 ```
@@ -191,7 +185,7 @@ Artifacts per run:
 
 ```
 checkpoint/<MODEL>/<EXP_NAME>/
-  best.weights
+  best.weights.h5
   hparams.json
   metrics.json            # best val recall + test metrics
   test_metrics.csv        # one-row CSV for spreadsheet compares
@@ -203,115 +197,80 @@ checkpoint/<MODEL>/<EXP_NAME>/
 
 ---
 
-## Optional interactive replay (epsilon-greedy, UCB1, LinUCB)
+## Checkpoints on Hugging Face
 
-This wraps the trained scorer with a small policy and runs offline replay on the validation split. It logs per-impression results and computes 95% bootstrap CIs.
+If a local weights file is missing, `scripts/evaluate.py` can download one from the Hub.
+The expected layout inside the model repo is: `<SUBDIR>/<EXP_NAME>/best.weights.h5`.
 
-epsilon-greedy example:
+| Model    | Subdir on Hub | Example exp_name | Direct link (folder) |
+|---------|----------------|------------------|----------------------|
+| MF      | `MF/`          | `exp-mf64`       | https://huggingface.co/farchan/CDR-checkpoints/tree/main/MF |
+| NeuMF   | `NEUMF/`       | `exp-neumf`      | https://huggingface.co/farchan/CDR-checkpoints/tree/main/NEUMF |
+| ItemKNN | `ITEMKNN/` or `MF/ITEMKNN/` | `exp-itemknn` | https://huggingface.co/farchan/CDR-checkpoints/tree/main/MF/ITEMKNN |
+| LightGCN| `LIGHTGCN/`    | `exp-lgcn`       | *(add if you upload)* |
 
-```bash
-python scripts/train.py \
-  --data_dir artifacts/movies_from_music/data \
-  --model mf --loss bpr \
-  --exp_name exp-mf-eps02 --out_root checkpoint \
-  --epochs 30 --emb_dim 64 \
-  --policy eps --epsilon 0.2 --replay_after_train \
-  --candidate_topn 200 --slate_k 10 --bootstrap_iters 1000
-```
-
-UCB1 example:
+Examples:
 
 ```bash
-python scripts/train.py \
+# Pull MF weights from the Hub
+python scripts/evaluate.py \
   --data_dir artifacts/movies_from_music/data \
-  --model neumf --loss bpr \
-  --exp_name exp-neumf-ucb --out_root checkpoint \
-  --epochs 30 --emb_dim 64 \
-  --policy ucb --alpha 0.5 --replay_after_train
-```
+  --model mf --exp_name exp-mf64 \
+  --hf_repo farchan/CDR-checkpoints \
+  --split test --topk 10 --eval_negs 99 --save_embeddings
 
-LinUCB example:
-
-```bash
-python scripts/train.py \
+# Pull NeuMF weights from the Hub
+python scripts/evaluate.py \
   --data_dir artifacts/movies_from_music/data \
-  --model lightgcn --loss bpr \
-  --exp_name exp-lgcn-linucb --out_root checkpoint \
-  --epochs 30 --emb_dim 64 --lightgcn_layers 3 \
-  --policy linucb --alpha 0.3 --replay_after_train
+  --model neumf --exp_name exp-neumf \
+  --hf_repo farchan/CDR-checkpoints \
+  --split test --topk 10 --eval_negs 99
 ```
-
-Replay artifacts (in the same experiment folder):
-
-```
-bandit_events.csv             # one row per impression: uid, pos_i, top1, reward, hit@K
-bandit_learning_curve.csv     # cumulative recall@K and ctr@1 over impressions
-bandit_report.json            # replay_recall@K, ctr@1, and 95% CIs
-```
-
-How to decide if RL helped:
-- Higher `replay_recall@K` and stable `replay_ctr@1`.
-- Non-overlapping 95% CIs across runs is a good sign.
-- Base test metrics should remain similar because RL wraps inference.
 
 ---
 
-## Metrics
+## Test set results (fill in your runs)
 
-Sampled evaluation with `eval_negs` negatives per positive:
-- Precision@K, Recall@K, F1@K
-- MAP@K
-- NDCG@K
+This table to track results on the **target** domain test split. `@10` means K=10.
 
-Replay metrics:
-- hit@K per impression (Recall@K proxy)
-- reward at rank 1 (CTR@1 proxy)
-- 95% bootstrap CIs on both
+| Model | Exp name | K | Precision@10 | Recall@10 | F1@10 | Acc@10 | NDCG@10 | Notes |
+|------|----------|---|--------------|-----------|-------|--------|---------|-------|
+| MF | exp-mf64 | 10 |  |  |  |  |  |  |
+| NeuMF | exp-neumf | 10 |  |  |  |  |  |  |
+| ItemKNN | exp-itemknn | 10 |  |  |  |  |  |  |
+| LightGCN | exp-lgcn | 10 |  |  |  |  |  |  |
+
 
 ---
 
-## Repro guide (Music -> Movies)
+`@10` means we evaluate using the **top 10** items returned for each user.
 
-1) Download categories
+### Metric definitions (per user, then averaged over users)
 
-```bash
-python scripts/download_amazon_2018.py \
-  --root data/amazon2018 \
-  --cats CDs_and_Vinyl Movies_and_TV
-```
+- **Precision@K**: relevant items in the top K divided by K.  
+  `P@K = |TopK ∩ Rel| / K`
 
-2) Preprocess
+- **Recall@K**: relevant items in the top K divided by all relevant items for that user.  
+  `R@K = |TopK ∩ Rel| / |Rel|`
 
-```bash
-python scripts/preprocess_amazon_cdr.py \
-  --root data/amazon2018 \
-  --source CDs_and_Vinyl \
-  --target Movies_and_TV \
-  --out artifacts/movies_from_music \
-  --print_stats --save_stats
-```
+- **F1@K**: harmonic mean of Precision@K and Recall@K.  
+  `F1@K = 2 * P@K * R@K / (P@K + R@K)`
 
-3) Train MF
+- **Acc@K** (a.k.a. HitRate@K): 1 if there is **at least one** relevant item in the top K, else 0. Then average across users.  
+  `Acc@K = 1 if |TopK ∩ Rel| ≥ 1 else 0` (averaged)
 
-```bash
-python scripts/train.py \
-  --data_dir artifacts/movies_from_music/data \
-  --model mf --loss bpr \
-  --exp_name exp-mf64 --out_root checkpoint \
-  --epochs 30 --emb_dim 64
-```
+- **NDCG@K**: rank-aware gain.  
+  `DCG@K = Σ_{j=1..K} rel_j / log2(j+1)` and `NDCG@K = DCG@K / IDCG@K`
 
-
+Notes:
+- In our sampled evaluation, we rank each positive against `eval_negs` sampled negatives per user.
+- If your use case has multiple positives per user in the test set, the definitions still apply.
 
 ---
 
 ## References
 
-- Rendle, S. BPR: Bayesian Personalized Ranking from Implicit Feedback. UAI 2009.
-- He, X. et al. Neural Collaborative Filtering. WWW 2017.
-- He, X. et al. LightGCN: Simplifying and Powering Graph Convolution Network for Recommendation. SIGIR 2020.
-- Sarwar, B. et al. Item-Based Collaborative Filtering Recommendation Algorithms. WWW 2001.
-- Li, L. et al. A Contextual-Bandit Approach to Personalized News Article Recommendation. WWW 2010.
-- Ni, J., Li, J., McAuley, J. Justifying Recommendations using Distantly-Labeled Reviews and Fine-Grained Aspects. EMNLP 2019.
-- Huang, Ling, et al. "Knowledge-Reinforced Cross-Domain Recommendation." IEEE Transactions on Neural Networks and Learning Systems (2024).
-- Zhao, Chuang, et al. "Cross-domain recommendation via progressive structural alignment." IEEE Transactions on Knowledge and Data Engineering 36.6 (2023): 2401-2415.
+- Rendle, S. **BPR: Bayesian Personalized Ranking from Implicit Feedback.** UAI 2009.  
+- He, X. et al. **Neural Collaborative Filtering.** WWW 2017.  
+- He, X. et al. **LightGCN: Simplifying and Powering Graph Convolution Network for Recommendation.** SIGIR 2020.  
+- Sarwar, B. et al. **Item-Based Collaborative Filtering Recommendation Algorithms.** WWW 2001.
