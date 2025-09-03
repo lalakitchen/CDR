@@ -88,7 +88,7 @@ scipy
 huggingface_hub
 ```
 
-GPU is optional. If TensorFlow cannot see your GPU, it will run on CPU.
+GPU is optional. If TensorFlow cannot see  GPU, it will run on CPU.
 
 ---
 
@@ -99,12 +99,11 @@ GPU is optional. If TensorFlow cannot see your GPU, it will run on CPU.
 This helper creates the folder structure and downloads gzipped JSON files for reviews and metadata.
 
 ```bash
-python scripts/download_amazon_2018.py   --root data/amazon2018   --cats Books Movies_and_TV CDs_and_Vinyl          Clothing_Shoes_and_Jewelry Electronics Home_and_Kitchen Toys_and_Games
-```
+python scripts/download_amazon_2018.py \
+  --root data/amazon2018 \
+  --cats Digital_Music Movies_and_TV \
+        Books Clothing_Shoes_and_Jewelry Electronics Home_and_Kitchen Toys_and_Games
 
-Tips:
-- If you only need a Music → Movies scenario, pass just `CDs_and_Vinyl` and `Movies_and_TV`.
-- These files are large.
 
 ### 2) Preprocess to cross-domain splits
 
@@ -119,7 +118,7 @@ What this does:
 Run:
 
 ```bash
-python scripts/preprocess_amazon_cdr.py   --root data/amazon2018   --source CDs_and_Vinyl   --target Movies_and_TV   --out artifacts/movies_from_music   --print_stats --save_stats
+python scripts/preprocess_amazon_cdr.py   --root data/amazon2018   --source Digital_Music    --target Movies_and_TV   --out artifacts/movies_from_music   --print_stats --save_stats
 ```
 
 Outputs:
@@ -145,10 +144,10 @@ All models use pairwise ranking (BPR) by default. Evaluation samples `eval_negs`
 
 Use this one command for any model:
 ```bash
-python scripts/train.py   --data_dir artifacts/movies_from_music/data   --model <mf|neumf|neumf_attention|itemknn|lightgcn|lightgcn_attention>   --exp_name <your-exp-name> --out_root checkpoint   --epochs <n> --emb_dim 64 --topk 10 --eval_negs 99   [--loss bpr] [--save_embeddings]   [--itemknn_topk_neighbors 200]   [--lightgcn_layers 3]
+python scripts/train.py   --data_dir artifacts/movies_from_music/data   --model <mf|neumf|neumf_attention|itemknn|lightgcn|lightgcn_attention>   --exp_name <exp-name> --out_root checkpoint   --epochs <n> --emb_dim 64 --topk 10 --eval_negs 99   [--loss bpr] [--save_embeddings]   [--itemknn_topk_neighbors 200]   [--lightgcn_layers 3]
 ```
 
-Quick presets (fill `<your-exp-name>` and `<n>`):
+Quick presets (fill `<exp-name>` and `<n>`):
 - **MF**: `--model mf --epochs 30`
 - **NeuMF**: `--model neumf --epochs 30`
 - **NeuMF + Attention (QKV)**: `--model neumf_attention --epochs 30`
@@ -171,25 +170,27 @@ checkpoint/<MODEL>/<EXP_NAME>/
 ```
 
 ---
+## Checkpoints (Hugging Face, manual)
 
-## Checkpoints on Hugging Face
+Download `best.weights.h5` from the folder links below and place it at:
+`checkpoint/<SUBDIR>/<EXP_NAME>/best.weights.h5`
 
-If a local weights file is missing, `scripts/evaluate.py` can download one from the Hub.
-The expected layout inside the Hub repo is: `<SUBDIR>/<EXP_NAME>/best.weights.h5`.
+| Model    | Subdir on Hub              | Example `exp_name` | Folder |
+|---------|-----------------------------|--------------------|--------|
+| MF      | `MF/`                       | `exp-mf64`         | [Open](https://huggingface.co/farchan/CDR-checkpoints/tree/main/MF) |
+| NeuMF   | `NEUMF/`                    | `exp-neumf`        | [Open](https://huggingface.co/farchan/CDR-checkpoints/tree/main/NEUMF) |
+| ItemKNN | `ITEMKNN/` or `MF/ITEMKNN/` | `exp-itemknn`      | [Open](https://huggingface.co/farchan/CDR-checkpoints/tree/main/MF/ITEMKNN) |
+| LightGCN| `LIGHTGCN/`                 | `exp-lgcn`         | *(add if you upload)* |
 
-| Model    | Subdir on Hub              | Example exp_name | Direct link (folder) |
-|---------|-----------------------------|------------------|----------------------|
-| MF      | `MF/`                       | `exp-mf64`       | [Link](https://huggingface.co/farchan/CDR-checkpoints/tree/main/MF) |
-| NeuMF   | `NEUMF/`                    | `exp-neumf`      | [Link](https://huggingface.co/farchan/CDR-checkpoints/tree/main/NEUMF) |
-| ItemKNN | `ITEMKNN/` or `MF/ITEMKNN/` | `exp-itemknn`    | [Link](https://huggingface.co/farchan/CDR-checkpoints/tree/main/MF/ITEMKNN) |
-| LightGCN| `LIGHTGCN/`                 | `exp-lgcn`       | *(add if you upload)* |
+**Example (MF, exp-mf64)**  
+Place the file at: `checkpoint/MF/exp-mf64/best.weights.h5`
 
-Examples:
-
+Then run:
 ```bash
-# Pull MF weights from the Hub
-python scripts/evaluate.py   --data_dir artifacts/movies_from_music/data   --model mf --exp_name exp-mf64   --hf_repo farchan/CDR-checkpoints   --split test --topk 10 --eval_negs 99 --save_embeddings
-```
+python scripts/evaluate.py \
+  --data_dir artifacts/movies_from_music/data \
+  --model mf --exp_name exp-mf64 \
+  --split test --topk 10 --eval_negs 99 --save_embeddings
 
 
 ---
@@ -210,44 +211,26 @@ jupyter notebook notebook/
 ```
 
 ---
+## Test set results
 
-## Test set results (fill in your runs)
+Fill in results on the **target** test split. `@10` means we evaluate the **top 10** items per user.
 
-This table tracks results on the **target** domain test split. `@10` means K=10.
+| Model            | Precision@10 | Recall@10 | F1@10 | Acc@10 | NDCG@10 |
+|------------------|--------------|-----------|-------|--------|---------|
+| MF               |              |           |       |        |         |
+| NeuMF            |              |           |       |        |         |
+| NeuMF + Attn     |              |           |       |        |         |
+| ItemKNN          |              |           |       |        |         |
+| LightGCN         |              |           |       |        |         |
+| LightGCN + Attn  |              |           |       |        |         |
 
-| Model | Exp name | K | Precision@10 | Recall@10 | F1@10 | Acc@10 | NDCG@10 | Notes |
-|------|----------|---|--------------|-----------|-------|--------|---------|-------|
-| MF | exp-mf64 | 10 |  |  |  |  |  |  |
-| NeuMF | exp-neumf | 10 |  |  |  |  |  |  |
-| NeuMF+Attn | exp-neumf-attn | 10 |  |  |  |  |  |  |
-| ItemKNN | exp-itemknn | 10 |  |  |  |  |  |  |
-| LightGCN | exp-lgcn | 10 |  |  |  |  |  |  |
-| LightGCN+Attn | exp-lgcn-attn | 10 |  |  |  |  |  |  |
+### Metric definitions (per user, then averaged)
 
-`@10` means we evaluate using the **top 10** items returned for each user.
-
-### Metric definitions (per user, then averaged over users)
-
-- **Precision@K**: relevant items in the top K divided by K.  
-  `P@K = |TopK ∩ Rel| / K`
-
-- **Recall@K**: relevant items in the top K divided by all relevant items for that user.  
-  `R@K = |TopK ∩ Rel| / |Rel|`
-
-- **F1@K**: harmonic mean of Precision@K and Recall@K.  
-  `F1@K = 2 * P@K * R@K / (P@K + R@K)`
-
-- **Acc@K** (a.k.a. HitRate@K): 1 if there is **at least one** relevant item in the top K, else 0. Then average across users.  
-  `Acc@K = 1 if |TopK ∩ Rel| ≥ 1 else 0` (averaged)
-
-- **NDCG@K**: rank-aware gain.  
-  `DCG@K = Σ_{j=1..K} rel_j / log2(j+1)` and `NDCG@K = DCG@K / IDCG@K`
-
-Notes:
-- In our sampled evaluation, we rank each positive against `eval_negs` sampled negatives per user.
-- If your use case has multiple positives per user in the test set, the definitions still apply.
-
----
+- **Precision@K**: `|TopK ∩ Rel| / K`
+- **Recall@K**: `|TopK ∩ Rel| / |Rel|`
+- **F1@K**: `2 * P@K * R@K / (P@K + R@K)`
+- **Acc@K** (HitRate@K): `1 if |TopK ∩ Rel| ≥ 1 else 0` (then average)
+- **NDCG@K**: `DCG@K / IDCG@K`, with `DCG@K = Σ_{j=1..K} rel_j / log2(j+1)`
 
 ## References
 
