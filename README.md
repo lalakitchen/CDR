@@ -206,7 +206,7 @@ The expected layout inside the model repo is: `<SUBDIR>/<EXP_NAME>/best.weights.
 |---------|----------------|------------------|----------------------|
 | MF      | `MF/`          | `exp-mf64`       | https://huggingface.co/farchan/CDR-checkpoints/tree/main/MF |
 | NeuMF   | `NEUMF/`       | `exp-neumf`      | https://huggingface.co/farchan/CDR-checkpoints/tree/main/NEUMF |
-| ItemKNN | `ITEMKNN/` or `MF/ITEMKNN/` | `exp-itemknn` | https://huggingface.co/farchan/CDR-checkpoints/tree/main/MF/ITEMKNN |
+| ItemKNN | `ITEMKNN/` or `MF/ITEMKNN/` | `exp-itemknn` | https://huggingface.co/farchan/CDR-checkpoints/tree/main/ITEMKNN |
 | LightGCN| `LIGHTGCN/`    | `exp-lgcn`       | *(add if you upload)* |
 
 Examples:
