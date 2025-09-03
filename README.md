@@ -6,7 +6,8 @@ End-to-end pipeline for cross-domain recommendation.
 ## Demo (GIF)
 If your README viewer supports images, this will animate inline:
 
-![Interactive demo](NOTEBOOK/interactive_demo.gif)
+![Interactive demo](notebook/interactive_demo.gif)
+
 
 
 ---
