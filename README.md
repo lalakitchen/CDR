@@ -5,7 +5,6 @@ End-to-end pipeline for cross-domain recommendation (Music → Movies).
 ---
 
 ## Interactive Demo
-## Interactive Demo
 
 ![Interactive demo of the CDR UI](./notebook/interactive_demo.gif)
 
