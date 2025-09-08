@@ -4,7 +4,7 @@ End-to-end pipeline for cross-domain recommendation (Music → Movies).
 
 ---
 
-## Demo
+## Interactive Demo
 
 ![Interactive demo](notebook/interactive_demo.gif)
 
@@ -17,8 +17,8 @@ End-to-end pipeline for cross-domain recommendation (Music → Movies).
 ├── README.md
 ├── requirements.txt
 ├── scripts/
-│   ├── download_amazon_2018.py        # dataset fetch helper
-│   ├── preprocess_amazon_cdr.py       # data prep entrypoint
+│   ├── download_amazon.py        # dataset fetch helper
+│   ├── preprocess_amazon.py       # data prep entrypoint
 │   └── train.py                       # training + eval
 ├── src/
 │   └── cdr/
