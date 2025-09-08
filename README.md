@@ -37,7 +37,7 @@ End-to-end pipeline for cross-domain recommendation (Music → Movies).
 │       │   ├── neumf_attention.py     # NeuMF + QKV attention
 │       │   ├── itemknn.py             # Item-based CF (memory-based)
 │       │   ├── lightgcn.py            # Graph recommender
-│       │   └── lightgcn_attention.py  # LightGCN + QKV over layers
+│       │   
 │       └── train/
 │           ├── __init__.py
 │           └── trainer.py             # training loop
@@ -88,7 +88,7 @@ scipy
 huggingface_hub
 ```
 
-GPU is optional. If TensorFlow cannot see  GPU, it will run on CPU.
+GPU is optional. If TensorFlow cannot see your GPU, it will run on CPU.
 
 ---
 
@@ -148,7 +148,7 @@ All trainable models use **pairwise ranking (BPR)** by default. Evaluation sampl
 One command for any model:
 
 ```bash
-python scripts/train.py   --data_dir artifacts/movies_from_music/data   --model <mf|neumf|neumf_attention|itemknn|lightgcn|lightgcn_attention>   --exp_name <exp-name> --out_root checkpoint   --epochs <n> --emb_dim 64 --topk 10 --eval_negs 99   [--loss bpr] [--save_embeddings]   [--itemknn_topk_neighbors 200]   [--lightgcn_layers 3]
+python scripts/train.py   --data_dir artifacts/movies_from_music/data   --model <mf|neumf|neumf_attention|itemknn|lightgcn>   --exp_name <exp-name> --out_root checkpoint   --epochs <n> --emb_dim 64 --topk 10 --eval_negs 99   [--loss bpr] [--save_embeddings]   [--itemknn_topk_neighbors 200]   [--lightgcn_layers 3]
 ```
 
 Quick presets (fill `<exp-name>` and `<n>`):
@@ -157,7 +157,6 @@ Quick presets (fill `<exp-name>` and `<n>`):
 - **NeuMF + Attention (QKV)**: `--model neumf_attention --epochs 30`
 - **ItemKNN**: `--model itemknn --epochs 0 --itemknn_topk_neighbors 200`
 - **LightGCN**: `--model lightgcn --epochs 30 --lightgcn_layers 3`
-- **LightGCN + Attention (QKV)**: `--model lightgcn_attention --epochs 30 --lightgcn_layers 3`
 
 **Per-run artifacts:**
 
@@ -171,6 +170,30 @@ checkpoint/<MODEL>/<EXP_NAME>/
   REPORT.txt
   user_embeddings.npy     # optional
   item_embeddings.npy     # optional
+```
+
+---
+
+## Checkpoints (Hugging Face, manual)
+
+Download `best.weights.h5` from the links below and place it at:
+`checkpoint/<SUBDIR>/<EXP_NAME>/best.weights.h5`
+
+| Model    | Subdir on Hub              | Folder |
+|---------|-----------------------------|--------|
+| MF      | `MF/`                       | [Open](https://huggingface.co/farchan/CDR-checkpoints/tree/main/MF) |
+| NeuMF   | `NEUMF/`                    | [Open](https://huggingface.co/farchan/CDR-checkpoints/tree/main/NEUMF) |
+| NeuMF + Attn | `NEUMF+ATTENTION/`                  | [Open](https://huggingface.co/farchan/CDR-checkpoints/tree/main/NEUMF%2BAttention) |
+| ItemKNN | `ITEMKNN/`                  | [Open](https://huggingface.co/farchan/CDR-checkpoints/tree/main/ITEMKNN) |
+| LightGCN| `LIGHTGCN/`                 | [Open](https://huggingface.co/farchan/CDR-checkpoints/tree/main/LIGHTGCN)  |
+
+**Example (MF, `exp-mf64`)**  
+Place the file at: `checkpoint/MF/exp-mf64/best.weights.h5`
+
+Then run:
+
+```bash
+python scripts/evaluate.py   --data_dir artifacts/movies_from_music/data   --model mf --exp_name exp-mf64   --split test --topk 10 --eval_negs 99 --save_embeddings
 ```
 
 ---
@@ -193,13 +216,13 @@ checkpoint/<MODEL>/<EXP_NAME>/
 ## Data split statistics
 
 | Domain | Split | Users | Items | Interactions |
-|---|---|---:|---:|---:|---:|
+|---|---|---:|---:|---:|
 | Movie | Train | 79,532 | 37,507 | 954,823 |
-| Movie | Val   | 85,745 | 22,311 | 85,745  |
-| Movie | Test  | 91,794 | 22,561 | 91,794  |
-| Music | Train | 66,386 | 17,110 | 198,062 | 
+| Movie | Val   | 85,745 | 22,311 | 85,745 |
+| Movie | Test  | 91,794 | 22,561 | 91,794 |
+| Music | Train | 66,386 | 17,110 | 198,062 |
 
-**Totals (interactions):** Movies = **1,132,362** ; Music (train) = **198,062**.
+**Totals (interactions):** Movies = **1,132,362**; Music (train) = **198,062**.
 
 ---
 
@@ -213,15 +236,7 @@ checkpoint/<MODEL>/<EXP_NAME>/
 | NeuMF + Attention    | 6.175%       | 11.22%  | 31.22% | 38.44%  |
 | **LightGCN**         | **9.556%**   | **17.37%** | **46.20%** | **49.32%** |
 
-
-### Metric definitions (per user, then averaged)
-
-- **Precision@K**: `|TopK ∩ Rel| / K`
-- **F1@K**: `2 * P@K * R@K / (P@K + R@K)`
-- **Acc@K** (HitRate@K): `1 if |TopK ∩ Rel| ≥ 1 else 0` (then average)
-- **NDCG@K**: `DCG@K / IDCG@K`, with `DCG@K = Σ_{j=1..K} rel_j / log2(j+1)`
 *Higher is better. Results use 1 positive + 99 sampled negatives per user and K=10.*
-
 
 ---
 
