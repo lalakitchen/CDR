@@ -8,12 +8,11 @@ End-to-end pipeline for cross-domain recommendation (Music → Movies).
 
 ![Interactive demo of the CDR UI](./notebook/interactive_demo.gif)
 
-<details>
-  <summary>Can’t see it?</summary>
 
-  **Open the raw file:**  
-  https://raw.githubusercontent.com/lalakitchen/CDR/main/notebook/interactive_demo.gif
-</details>
+<summary>Can’t see it?</summary>
+**Open the raw file:**  
+https://raw.githubusercontent.com/lalakitchen/CDR/main/notebook/interactive_demo.gif
+
 
 ---
 
