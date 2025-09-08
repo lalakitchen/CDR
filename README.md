@@ -19,7 +19,8 @@ End-to-end pipeline for cross-domain recommendation (Music → Movies).
 ├── scripts/
 │   ├── download_amazon.py        # dataset fetch helper
 │   ├── preprocess_amazon.py       # data prep entrypoint
-│   └── train.py                       # training + eval
+│   └── train.py                       # training 
+    └── evaluate.py                       # eval
 ├── src/
 │   └── cdr/
 │       ├── __init__.py
