@@ -5,7 +5,7 @@ End-to-end pipeline for cross-domain recommendation (Music → Movies).
 ---
 
 ## Interactive Demo
-
+Path: notebook/interactive_demo.gif
 ![Interactive Demo](https://github.com/lalakitchen/CDR/blob/main/notebook/interactive_demo.gif?raw=true)
 
 ---
