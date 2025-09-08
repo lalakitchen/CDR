@@ -5,8 +5,16 @@ End-to-end pipeline for cross-domain recommendation (Music → Movies).
 ---
 
 ## Interactive Demo
-Path: notebook/interactive_demo.gif
-![Interactive Demo](https://github.com/lalakitchen/CDR/blob/main/notebook/interactive_demo.gif?raw=true)
+## Interactive Demo
+
+![Interactive demo of the CDR UI](./notebook/interactive_demo.gif)
+
+<details>
+  <summary>Can’t see it?</summary>
+
+  **Open the raw file:**  
+  https://raw.githubusercontent.com/lalakitchen/CDR/main/notebook/interactive_demo.gif
+</details>
 
 ---
 
