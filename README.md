@@ -1,5 +1,6 @@
+
 # Cross-Domain Recommendation
-End-to-end pipeline for cross-domain recommendation.
+End-to-end pipeline for cross-domain recommendation (Music → Movies).
 
 ---
 
@@ -87,7 +88,7 @@ scipy
 huggingface_hub
 ```
 
-GPU is optional. If TensorFlow cannot see your GPU, it will run on CPU.
+GPU is optional. If TensorFlow cannot see  GPU, it will run on CPU.
 
 ---
 
@@ -98,10 +99,7 @@ GPU is optional. If TensorFlow cannot see your GPU, it will run on CPU.
 This helper creates the folder structure and downloads gzipped JSON files for reviews and metadata.
 
 ```bash
-python scripts/download_amazon_2018.py \
-  --root data/amazon2018 \
-  --cats Digital_Music Movies_and_TV \
-         Books Clothing_Shoes_and_Jewelry Electronics Home_and_Kitchen Toys_and_Games
+python scripts/download_amazon_2018.py   --root data/amazon2018   --cats Digital_Music Movies_and_TV          Books Clothing_Shoes_and_Jewelry Electronics Home_and_Kitchen Toys_and_Games
 ```
 
 Tips:
@@ -111,22 +109,19 @@ Tips:
 ### 2) Preprocess to cross-domain splits
 
 What this does:
-- Cleans missing essentials. Normalizes rating to `[0,1]`. Normalizes timestamp per user to `[0,1]`.
+- Drops rows with missing IDs/ratings/timestamps; clips ratings to `[1,5]`.
+- Deduplicates each user–item pair by **keeping the most recent** interaction.
+- Normalizes rating to `[0,1]` and timestamp per user to `[0,1]`.
 - Keeps items without metadata by filling `item_cat="unknown"`.
-- Keeps users with fewer than 5 interactions.
-- Filters to overlapping users across source and target (unless `--keep_all_users`).
-- Target split per user: last → **test**, second-last → **val**, rest → **train**.
-- Train set = all **source** interactions + **target-train** interactions.
+- **Filters to overlapping users** across source and target (unless `--keep_all_users`).
+- **Filters to users with >5 interactions and items with >5 ratings** to reduce extreme sparsity.
+- **Target (Movies)** split per user: last → **test**, second-last → **val**, others → **train** (chronological leave-one-out).
+- **Train set = all source (Music) interactions + target-train (Movies)** interactions.
 
 Run:
 
 ```bash
-python scripts/preprocess_amazon_cdr.py \
-  --root data/amazon2018 \
-  --source Digital_Music \
-  --target Movies_and_TV \
-  --out artifacts/movies_from_music \
-  --print_stats --save_stats
+python scripts/preprocess_amazon_cdr.py   --root data/amazon2018   --source Digital_Music   --target Movies_and_TV   --out artifacts/movies_from_music   --print_stats --save_stats
 ```
 
 Outputs:
@@ -148,19 +143,12 @@ artifacts/movies_from_music/
 
 ## Train and evaluate
 
-All models use pairwise ranking (BPR) by default. Evaluation samples `eval_negs` negatives per positive.
+All trainable models use **pairwise ranking (BPR)** by default. Evaluation samples `--eval_negs` negatives per positive (default **99**).
 
-Use this one command for any model:
+One command for any model:
 
 ```bash
-python scripts/train.py \
-  --data_dir artifacts/movies_from_music/data \
-  --model <mf|neumf|neumf_attention|itemknn|lightgcn|lightgcn_attention> \
-  --exp_name <exp-name> --out_root checkpoint \
-  --epochs <n> --emb_dim 64 --topk 10 --eval_negs 99 \
-  [--loss bpr] [--save_embeddings] \
-  [--itemknn_topk_neighbors 200] \
-  [--lightgcn_layers 3]
+python scripts/train.py   --data_dir artifacts/movies_from_music/data   --model <mf|neumf|neumf_attention|itemknn|lightgcn|lightgcn_attention>   --exp_name <exp-name> --out_root checkpoint   --epochs <n> --emb_dim 64 --topk 10 --eval_negs 99   [--loss bpr] [--save_embeddings]   [--itemknn_topk_neighbors 200]   [--lightgcn_layers 3]
 ```
 
 Quick presets (fill `<exp-name>` and `<n>`):
@@ -171,14 +159,14 @@ Quick presets (fill `<exp-name>` and `<n>`):
 - **LightGCN**: `--model lightgcn --epochs 30 --lightgcn_layers 3`
 - **LightGCN + Attention (QKV)**: `--model lightgcn_attention --epochs 30 --lightgcn_layers 3`
 
-**Artifacts per run:**
+**Per-run artifacts:**
 
 ```
 checkpoint/<MODEL>/<EXP_NAME>/
   best.weights.h5
   hparams.json
   metrics.json            # best val recall + test metrics
-  test_metrics.csv        # one-row CSV for spreadsheet compares
+  test_metrics.csv        # one-row CSV for comparisons
   train_log.csv           # epoch-wise loss + val metrics
   REPORT.txt
   user_embeddings.npy     # optional
@@ -187,29 +175,53 @@ checkpoint/<MODEL>/<EXP_NAME>/
 
 ---
 
-## Checkpoints (Hugging Face, manual)
+## Evaluation protocol (offline)
 
-Download `best.weights.h5` from the folder links below and place it at:
-`checkpoint/<SUBDIR>/<EXP_NAME>/best.weights.h5`
+- **Candidate set.** For each user, we rank a fixed set of **100 movies**: the user’s held-out movie (**1 positive**) plus **99 sampled** movies the user has not seen.
+- **Metrics.** We report **Precision@10, Recall@10, NDCG@10, and MAP@10**. “@10” means each metric is computed with respect to the **top ten** recommendations.
 
-| Model    | Subdir on Hub              | Folder |
-|---------|-----------------------------|--------|
-| MF      | `MF/`                       | [Open](https://huggingface.co/farchan/CDR-checkpoints/tree/main/MF) |
-| NeuMF   | `NEUMF/`                    | [Open](https://huggingface.co/farchan/CDR-checkpoints/tree/main/NEUMF) |
-| ItemKNN | `ITEMKNN/` or `MF/ITEMKNN/` | [Open](https://huggingface.co/farchan/CDR-checkpoints/tree/main/MF/ITEMKNN) |
-| LightGCN| `LIGHTGCN/`                 | *(add if you upload)* |
+---
 
-**Example (MF, `exp-mf64`)**  
-Place the file at: `checkpoint/MF/exp-mf64/best.weights.h5`
+## Interactive demo (qualitative)
 
-Then run:
+- **Seed:** The user selects one or more **music** titles from a list.
+- **Map music → movies:** The system builds a **session profile** by combining a neutral profile with the **average embedding of the selected songs**, then **ranks movies only** by similarity to that profile and returns a **Top-10**.
+- **Align with feedback:** **Like** shifts the profile **toward** that movie; **Dislike** shifts it **away**; high/low **ratings** act similarly. Recommendations **refresh immediately**.
 
-```bash
-python scripts/evaluate.py \
-  --data_dir artifacts/movies_from_music/data \
-  --model mf --exp_name exp-mf64 \
-  --split test --topk 10 --eval_negs 99 --save_embeddings
-```
+---
+
+## Data split statistics
+
+| Domain | Split | Users | Items | Interactions |
+|---|---|---:|---:|---:|---:|
+| Movie | Train | 79,532 | 37,507 | 954,823 |
+| Movie | Val   | 85,745 | 22,311 | 85,745  |
+| Movie | Test  | 91,794 | 22,561 | 91,794  |
+| Music | Train | 66,386 | 17,110 | 198,062 | 
+
+**Totals (interactions):** Movies = **1,132,362** ; Music (train) = **198,062**.
+
+---
+
+## Model performance (Movies test split)
+
+| Model                | Precision@10 | F1@10   | MAP@10 | NDCG@10 |
+|----------------------|-------------:|--------:|-------:|--------:|
+| MF                   | 4.736%       | 8.61%   | 30.32% | 30.32%  |
+| ItemKNN (Collab. CF) | 4.869%       | 8.885%  | 25.84% | 31.25%  |
+| NeuMF                | 5.564%       | 10.27%  | 28.79% | 35.11%  |
+| NeuMF + Attention    | 6.175%       | 11.22%  | 31.22% | 38.44%  |
+| **LightGCN**         | **9.556%**   | **17.37%** | **46.20%** | **49.32%** |
+
+
+### Metric definitions (per user, then averaged)
+
+- **Precision@K**: `|TopK ∩ Rel| / K`
+- **F1@K**: `2 * P@K * R@K / (P@K + R@K)`
+- **Acc@K** (HitRate@K): `1 if |TopK ∩ Rel| ≥ 1 else 0` (then average)
+- **NDCG@K**: `DCG@K / IDCG@K`, with `DCG@K = Σ_{j=1..K} rel_j / log2(j+1)`
+*Higher is better. Results use 1 positive + 99 sampled negatives per user and K=10.*
+
 
 ---
 
@@ -217,39 +229,11 @@ python scripts/evaluate.py \
 
 - `notebook/EDA.ipynb` – quick data exploration.
 - `notebook/INTERACTIVE_DEMO.ipynb` – small UI for trying a trained model.  
-  Save a short screen recording of this and convert it to `notebook/interactive_demo.gif` (used at the top).
-  Example (ffmpeg):
-  ```bash
-  ffmpeg -i demo.mp4 -vf "fps=20,scale=900:-1:flags=lanczos" -loop 0 notebook/interactive_demo.gif
-  ```
 
 Launch Jupyter:
 ```bash
 jupyter notebook notebook/
 ```
-
----
-
-## Test set results
-
-Fill in results on the **target** test split. `@10` means we evaluate the **top 10** items per user.
-
-| Model            | Precision@10 | Recall@10 | F1@10 | Acc@10 | NDCG@10 |
-|------------------|--------------|-----------|-------|--------|---------|
-| MF               |              |           |       |        |         |
-| NeuMF            |              |           |       |        |         |
-| NeuMF + Attn     |              |           |       |        |         |
-| ItemKNN          |              |           |       |        |         |
-| LightGCN         |              |           |       |        |         |
-| LightGCN + Attn  |              |           |       |        |         |
-
-### Metric definitions (per user, then averaged)
-
-- **Precision@K**: `|TopK ∩ Rel| / K`
-- **Recall@K**: `|TopK ∩ Rel| / |Rel|`
-- **F1@K**: `2 * P@K * R@K / (P@K + R@K)`
-- **Acc@K** (HitRate@K): `1 if |TopK ∩ Rel| ≥ 1 else 0` (then average)
-- **NDCG@K**: `DCG@K / IDCG@K`, with `DCG@K = Σ_{j=1..K} rel_j / log2(j+1)`
 
 ---
 

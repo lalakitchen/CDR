@@ -205,7 +205,7 @@ def run_replay_policy(
         chosen = policy.rank(u, cand_ids, base_scores, k=slate_k, feature_fn=feature_fn)
 
         hit_k = 1 if pos_i in set(chosen) else 0
-        top1 = int(chosen[0])
+        top1 = chosen[0]
         reward = 1.0 if top1 == pos_i else 0.0
 
         # update bandit on top-1
@@ -303,9 +303,14 @@ def train_and_eval(
     Supports models:
       - mf         : trainable, uses BPR
       - neumf      : trainable, uses BPR
+      - neumf_attention : trainable, uses BPR
       - itemknn    : NON-trainable memory-based CF (set epochs=0 to skip loop)
-      - lightgcn   : trainable GNN, uses BPR
-        (LightGCN family can cache propagated embeddings for EVAL ONLY)
+      - lightgcn / lightgcn_attention : trainable GNNs, use BPR
+
+    Saves under: <out_root>/<MODEL>/<exp_name>/
+      best.weights.h5, hparams.json, train_log.csv, metrics.json, test_metrics.csv, REPORT.txt
+    And, if replay is enabled:
+      bandit_events.csv, bandit_learning_curve.csv, bandit_report.json
     """
     _set_seeds(seed)
 
@@ -361,10 +366,8 @@ def train_and_eval(
     ds = make_bpr_dataset(train_pairs, n_items, user_pos_train, batch_size)
     it = iter(ds)  # persistent iterator
 
-    # -------------------- build model / loss / opt --------------------
+    # Model / loss / optimizer
     name = model_name.lower()
-    is_lightgcn_family = name.startswith("lightgcn")  # "lightgcn", "lightgcn_attention", etc.
-
     if name == "itemknn":
         model = build_model(
             model_name,
@@ -375,8 +378,7 @@ def train_and_eval(
         )
         loss_fn = None
         optimizer = None
-
-    elif is_lightgcn_family:
+    elif name.startswith("lightgcn"):  # supports lightgcn + attention variants
         norm_adj = _build_norm_adj(train_pairs, n_users, n_items)
         model = build_model(
             model_name,
@@ -389,12 +391,15 @@ def train_and_eval(
         )
         loss_fn = get_loss(loss_name)
         optimizer = tf.keras.optimizers.Adam(lr)
-
     else:
-        # mf / neumf / neumf_attention (same signature)
+        # mf / neumf / neumf_attention
         model = build_model(model_name, n_users=n_users, n_items=n_items, d=emb_dim, l2=l2)
         loss_fn = get_loss(loss_name)
         optimizer = tf.keras.optimizers.Adam(lr)
+
+    # --- Ensure the model is BUILT once (Keras 3 requirement) ---
+    if name != "itemknn":
+        _ = model((tf.constant([0], tf.int32), tf.constant([0], tf.int32)), training=False)
 
     # Paths
     ckpt_path = out_dir / "best.weights.h5"
@@ -406,7 +411,7 @@ def train_and_eval(
     # Resume (trainable models only)
     if resume and ckpt_path.exists() and name != "itemknn":
         print(f"Resuming from {ckpt_path}")
-        _ = model.score(tf.constant([0], tf.int32), tf.constant([0], tf.int32))
+        # model already built above; safe to load
         model.load_weights(str(ckpt_path))
 
     @tf.function
@@ -421,7 +426,7 @@ def train_and_eval(
         optimizer.apply_gradients(zip(grads, model.trainable_variables))
         return loss
 
-    # -------------------- Train --------------------
+    # Train
     history_rows = []
     best_val = -1.0
     best_epoch = -1
@@ -430,15 +435,15 @@ def train_and_eval(
 
     if epochs <= 0:
         print("Epochs set to 0 — skipping training loop.")
-        # Cache ONLY for evaluation
         if cache_lightgcn and hasattr(model, "recompute_cache"):
-            model.recompute_cache(training=False)
+            model.recompute_cache()
         val_m = evaluate_ranking(model, val, user_pos_all, target_item_pool, "val", topk, eval_negs)
         best_val = val_m["recall"]; best_epoch = 0
-
     else:
         for epoch in range(1, epochs + 1):
-            # ---- Training epoch (NO caching here; keep gradients alive) ----
+            if cache_lightgcn and hasattr(model, "recompute_cache"):
+                model.recompute_cache()
+
             if name != "itemknn":
                 pbar = tqdm(range(steps_per_epoch), desc=f"{model_name.upper()} Epoch {epoch:02d}")
                 losses = []
@@ -453,10 +458,7 @@ def train_and_eval(
 
             print(f"Epoch {epoch:02d} | train loss: {avg_loss:.4f}")
 
-            # ---- Validation (cache allowed for LightGCN family) ----
-            if cache_lightgcn and hasattr(model, "recompute_cache"):
-                model.recompute_cache(training=False)
-
+            # Validation
             val_m = evaluate_ranking(model, val, user_pos_all, target_item_pool, "val", topk, eval_negs)
 
             improved = val_m["recall"] > best_val
@@ -478,7 +480,7 @@ def train_and_eval(
                 best_epoch = epoch
                 patience_left = patience
                 if name != "itemknn":
-                    _ = model.score(tf.constant([0], tf.int32), tf.constant([0], tf.int32))
+                    # model is already built; just save
                     model.save_weights(str(ckpt_path))
                     print(f"Saved best to {ckpt_path}")
             else:
@@ -493,13 +495,12 @@ def train_and_eval(
 
     # Load best and test (trainable models only)
     if ckpt_path.exists() and name != "itemknn":
-        _ = model.score(tf.constant([0], tf.int32), tf.constant([0], tf.int32))
+        # model already built; safe to load
         model.load_weights(str(ckpt_path))
         print(f"Loaded best weights from {ckpt_path}")
 
-    # Cache for test-time scoring (LightGCN family)
     if cache_lightgcn and hasattr(model, "recompute_cache"):
-        model.recompute_cache(training=False)
+        model.recompute_cache()
 
     test_m = evaluate_ranking(model, test, user_pos_all, target_item_pool, "test", topk, eval_negs)
 

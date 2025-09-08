@@ -1,20 +1,23 @@
 #!/usr/bin/env python3
 """
-preprocess_amazon_cdr.py  (with tqdm progress, tracing, and split-wise stats)
+preprocess_amazon.py  
 
 Usage:
   python scripts/preprocess_amazon.py \
-    --root data/amazon2018 \
-    --source CDs_and_Vinyl \
-    --target Movies_and_TV \
-    --out artifacts/movies_from_music \
-    --print_stats --save_stats
+      --root data/amazon2018 \
+      --source Digital_Music \
+      --target Movies_and_TV \
+      --out artifacts/movies_from_music \
+      --print_stats --save_stats \
+      --min_interactions 5
+
 
 What it does
 - Loads Amazon 2018 per-category reviews + metadata
 - Cleans missing values, normalizes rating (0..1) and per-user time (0..1)
-- Keeps items with missing metadata (item_cat='unknown'); keeps users with <5 interactions
-- Filters to overlapping users (unless --keep_all_users)
+- Keeps items with missing metadata (item_cat='unknown')
+- **Filters to overlapping users by default** (unless --keep_all_users); logs overlap ratio and warns if <3%
+- **Filters to active entities:** keeps users with > min_interactions ratings and items with > min_interactions received ratings (strictly greater-than)
 - Builds shared user and item id maps (items are keyed as "<DOMAIN>::<ASIN>")
 - Splits target per user: last->test, second-last->val, others->train; all source interactions go to train
 - Saves Parquet splits + id maps
@@ -202,6 +205,8 @@ def main():
     ap.add_argument("--target", type=str, required=True, help="Target category (e.g., Movies_and_TV)")
     ap.add_argument("--out", type=Path, required=True, help="Output directory for artifacts")
     ap.add_argument("--keep_all_users", action="store_true", help="If set, do NOT filter to common users")
+    ap.add_argument("--min_interactions", type=int, default=5,
+                    help="Keep users/items with > this many interactions (strictly greater-than)")
     ap.add_argument("--print_stats", action="store_true", help="Print split-wise tables")
     ap.add_argument("--save_stats", action="store_true", help="Save the tables as CSV under <out>/stats/")
     args = ap.parse_args()
@@ -227,18 +232,56 @@ def main():
     df_tgt = df_tgt.merge(meta_tgt, on="item_id", how="left")
     df_tgt["item_cat"] = df_tgt["item_cat"].fillna("unknown").astype(str)
 
-    # Filter to common users unless told otherwise
+    # Compute overlap stats and optionally filter to common users
+    all_users = set(df_src["user_id"]).union(set(df_tgt["user_id"]))
+    common_users = set(df_src["user_id"]).intersection(set(df_tgt["user_id"]))
+    overlap_ratio = (len(common_users) / len(all_users)) if all_users else 0.0
+    log(f"Overlapping users: {len(common_users):,} ({overlap_ratio*100:.2f}% of all users)")
+    if overlap_ratio < 0.03:
+        log("WARNING: user overlap < 3%. You are in an extreme sparse-overlap regime.")
+
     if not args.keep_all_users:
-        common_users = set(df_src["user_id"]).intersection(set(df_tgt["user_id"]))
-        log(f"Overlapping users: {len(common_users):,}")
         df_src = df_src[df_src["user_id"].isin(common_users)].copy()
         df_tgt = df_tgt[df_tgt["user_id"].isin(common_users)].copy()
     else:
         log("Keeping all users (no overlap filter)")
 
-    # Build ID maps
+    # Build domain-qualified item keys BEFORE count-based filtering
     df_src["item_key"] = args.source + "::" + df_src["item_id"]
     df_tgt["item_key"] = args.target + "::" + df_tgt["item_id"]
+
+    # Filter to users/items with > min_interactions across both domains (strictly greater-than)
+    df_all_keys = pd.concat([
+        df_src[["user_id", "item_key"]],
+        df_tgt[["user_id", "item_key"]]
+    ], ignore_index=True)
+
+    user_counts = df_all_keys.groupby("user_id").size().astype(int)
+    item_counts = df_all_keys.groupby("item_key").size().astype(int)
+
+    keep_users = set(user_counts[user_counts > args.min_interactions].index)
+    keep_items = set(item_counts[item_counts > args.min_interactions].index)
+
+    log(
+        f"Users kept (> {args.min_interactions} interactions): {len(keep_users):,} "
+        f"(dropped {len(user_counts) - len(keep_users):,})"
+    )
+    log(
+        f"Items kept (> {args.min_interactions} ratings): {len(keep_items):,} "
+        f"(dropped {len(item_counts) - len(keep_items):,})"
+    )
+
+    before_src, before_tgt = len(df_src), len(df_tgt)
+    df_src = df_src[df_src["user_id"].isin(keep_users) & df_src["item_key"].isin(keep_items)].copy()
+    df_tgt = df_tgt[df_tgt["user_id"].isin(keep_users) & df_tgt["item_key"].isin(keep_items)].copy()
+    log(f"Post count-filter rows — src: {len(df_src):,} (was {before_src:,}), tgt: {len(df_tgt):,} (was {before_tgt:,})")
+
+    # Early exit guardrails
+    if df_tgt.empty:
+        log("ERROR: Target dataframe is empty after filtering. Consider lowering --min_interactions or using --keep_all_users.")
+        return
+
+    # Build ID maps on the filtered frames
     users = pd.concat([df_src["user_id"], df_tgt["user_id"]], ignore_index=True).unique().tolist()
     items = pd.concat([df_src["item_key"], df_tgt["item_key"]], ignore_index=True).unique().tolist()
     uid_map, iid_map = build_id_maps(users, items)
@@ -286,6 +329,8 @@ def main():
         return f"{name}: users={df['uid'].nunique():,}, items={df['iid'].nunique():,}, interactions={len(df):,}"
     with open(args.out / "README.txt", "w", encoding="utf-8") as f:
         f.write(f"Source: {args.source}\nTarget: {args.target}\n\n")
+        f.write(f"Overlap ratio: {overlap_ratio*100:.2f}% ({len(common_users):,}/{len(all_users):,})\n")
+        f.write(f"Count filter: > {args.min_interactions} interactions\n\n")
         f.write(quick(train, "train") + "\n")
         f.write(quick(val,   "val")   + "\n")
         f.write(quick(test,  "test")  + "\n")

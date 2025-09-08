@@ -10,7 +10,6 @@ CUDA_VISIBLE_DEVICES=0 python scripts/train.py \
   --model mf --loss bpr \
   --exp_name exp-mf64-2 --out_root checkpoint \
   --epochs 30 --emb_dim 64 --topk 10 --eval_negs 99
-
 """
 
 import argparse
